@@ -52,10 +52,10 @@ def sampleWav(filename, freq, type=0):
     data, sampleRate = librosa.load(filename)
     length = int(len(data)/fraction)
     D = np.abs(librosa.cqt(data[:length], sr=sampleRate))
-    Spec = np.square(librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min).T)
+    Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min).T
     frames = len(Spec)
 
-    z = 5
+    z = 3
     if type == 1:
         z = 10
 
@@ -174,7 +174,7 @@ def modelInit():
         #b = Reshape(target_shape=(BINS,), name='input-reshape')(a)
         
         # Sigmoid yerine relu?
-        b = Dense(BINS, activation="sigmoid", name="dense")(a)
+        b = Dense(BINS, activation="relu", name="dense")(a)
         b = Dropout(0.15, name="dropout")(b)
         b = Dense(BINS, activation="sigmoid", name="dense2")(b)
         b = Dropout(0.15, name="dropout2")(b)
