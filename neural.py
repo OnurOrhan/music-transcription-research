@@ -38,10 +38,10 @@ all_notes = {'Elo':['E2','F2','F#2/Gb2','G2','G#2/Ab2','A2','A#2/Bb2','B2','C3',
                     'Ehi':['E4','F4','F#4/Gb4','G4','G#4/Ab4','A4','A#4/Bb4','B4','C5','C#5/Db5','D5','D#5/Eb5','E5']}
 
 valid_notes = ['A#2/Bb2', 'C3', 'D#3/Eb3', 'G#3/Ab3', 'C4', 'F#4/Gb4']
-test_notes = ['A2', 'B3', 'D3', 'E4', 'E2', 'G3', 'A1', 'D2', 'E1', 'G2']
-test_files = ['Ac1.mp3', 'Ac2.mp3', 'Ac3.mp3', 'Ac4.mp3', 'Ac5.mp3', 'Ac6.mp3', 'Ba1.mp3', 'Ba2.mp3', 'Ba3.mp3', 'Ba4.mp3']
-#test_notes = ['A2', 'B3', 'D3', 'E4', 'E2', 'G3', 'G2']
-#test_files = ['Ac1.mp3', 'Ac2.mp3', 'Ac3.mp3', 'Ac4.mp3', 'Ac5.mp3', 'Ac6.mp3', 'Ba4.mp3']
+#test_notes = ['A2', 'B3', 'D3', 'E4', 'E2', 'G3', 'A1', 'D2', 'E1', 'G2']
+#test_files = ['Ac1.mp3', 'Ac2.mp3', 'Ac3.mp3', 'Ac4.mp3', 'Ac5.mp3', 'Ac6.mp3', 'Ba1.mp3', 'Ba2.mp3', 'Ba3.mp3', 'Ba4.mp3']
+test_notes = ['A2', 'B3', 'D3', 'E4', 'E2', 'G3', 'G2']
+test_files = ['Ac1.mp3', 'Ac2.mp3', 'Ac3.mp3', 'Ac4.mp3', 'Ac5.mp3', 'Ac6.mp3', 'Ba4.mp3']
 
 def sampleWav(filename, freq, type=0):
     global trainx, trainy, validx, validy, testx, testy
@@ -56,7 +56,7 @@ def sampleWav(filename, freq, type=0):
     frames = len(Spec)
 
     z = 3
-    if type == 1:
+    if type == 2:
         z = 10
 
     rand = random.sample(range(0, frames), int(frames/z)) # Pick random data
@@ -76,21 +76,17 @@ def sampleWav(filename, freq, type=0):
         if len(validx) == 0:
             validx = np.array(Spec[rand,:])
             validy = pV
-            testx = np.array(Spec[rand,:])
-            testy = pV
         else:
             validx = np.append(validx, Spec[rand,:], axis=0)
             validy = np.append(validy, pV, axis=0)
-            testx = np.append(testx, Spec[rand,:], axis=0)
-            testy = np.append(testy, pV, axis=0)
 
-    """elif type == 2:
+    elif type == 2:
         if len(testx) == 0:
             testx = np.array(Spec[rand,:])
             testy = pV
         else:
             testx = np.append(testx, Spec[rand,:], axis=0)
-            testy = np.append(testy, pV, axis=0)   """     
+            testy = np.append(testy, pV, axis=0)   
     return
 
 def freq2Index(freq):
@@ -143,7 +139,7 @@ def initData():
     print("Processing test files, please wait...")
     for i, f in enumerate(test_files): # Dataset 2
         freq = freqs[test_notes[i]]
-        sampleWav(f, freq, 0)
+        sampleWav(f, freq, 2)
     os.chdir("../..")
 
 """def initSinusoids():
@@ -186,8 +182,8 @@ def modelInit():
 def modelSummary():
     model.summary()
 
-def modelFit(e=16, b=32):
-    model.fit(x=trainx, y=trainy, epochs=e, batch_size=b, verbose=2, validation_data=(validx, validy))
+def modelFit(e=16, b=32, v=0):
+    model.fit(x=trainx, y=trainy, epochs=e, batch_size=b, verbose=v, validation_data=(validx, validy))
 
 def modelLoadWeights(filename, sinusoids=True):
     global model
@@ -208,7 +204,7 @@ def modelPredict(pred):
 
 def testFile(filename, freq):
     data, sampleRate = librosa.load(filename)
-    D = librosa.stft(data)
+    D = np.abs(librosa.cqt(data, sr=sampleRate))
     Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min)
     frames = []
     frames.append(Spec.mean(axis=1)) # Get the mean of the spectrum as input
