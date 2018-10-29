@@ -8,7 +8,7 @@ from keras.models import Model
 from numpy.lib.stride_tricks import as_strided  
 import matplotlib.pyplot as plt
 import librosa.display
-import IPython.display as ipd
+#import IPython.display as ipd
 # Reference #12: Classical MIDI Files, https://www.mfiles.co.uk/classical-midi.htm
 
 model = None
@@ -105,6 +105,16 @@ def initData(): # Initialize the training and validation data
         sampleWav(files[rand[j]], 1) # Add samples for the validation set
     
     os.chdir("../..")
+    print("Training samples: %d" % trainx.shape)
+    print("Validation samples: %d" % validx.shape)
+    if np.isnan(trainx).any():
+        print("Trainx has a NaN value!")
+    if np.isnan(trainy).any():
+        print("Trainy has a NaN value!")
+    if np.isnan(validx).any():
+        print("Validx has a NaN value!")
+    if np.isnan(validy).any():
+        print("Validy has a NaN value!")
 
 def modelClear(): # Clear the network model
     global model

@@ -8,7 +8,7 @@ from keras.models import Model
 from numpy.lib.stride_tricks import as_strided  
 import matplotlib.pyplot as plt
 import librosa.display
-import IPython.display as ipd
+#import IPython.display as ipd
 # Reference #9: https://www.kaggle.com/asparago/simple-pitch-detector  
 
 model = None
@@ -214,7 +214,7 @@ def testFile(filename, freq):
     plt.tight_layout()
     plt.show()
 
-    ipd.Audio(filename)
+    #ipd.Audio(filename)
 
     p = model.predict(np.array(Spec.T))
     librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time', cmap='magma')
