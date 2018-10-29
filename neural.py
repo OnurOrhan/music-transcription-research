@@ -101,7 +101,7 @@ def initData(): # Initialize the training and validation data
 
     print("Preparing validation set:")
     for j in range(n_train, total):
-        print("[%d/%d] %s..." % (j-n_train, total-n_train, files[rand[j]]))
+        print("[%d/%d] %s..." % (j-n_train+1, total-n_train, files[rand[j]]))
         sampleWav(files[rand[j]], 1) # Add samples for the validation set
     
     os.chdir("../..")
@@ -150,15 +150,31 @@ def testFile(filename): # Test the given file
     D = np.abs(librosa.cqt(data, sr=sampleRate, fmin=FREF, n_bins=BINS))
     Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min)
 
-    ipd.Audio(filename)
-
     librosa.display.specshow(Spec, y_axis='cqt_hz', x_axis='time', cmap='magma')
     plt.title("Spectrogram of %s" % filename)
     plt.colorbar(format='%+2.0f dB')
     plt.show()
 
+    ipd.Audio(filename)
+
+    z = np.zeros([len(data), 88])
+    with open("%s.txt" % filename.split('.')[0]) as f:
+        for line in f:
+            (i1, i2, i3) = line.split()
+            (a, b, c) = (float(i1), float(i2), float(i3))
+            freqq = freq2Index(a)
+            for j in range(round(sampleRate*b), round(sampleRate*c)):
+                z[j, freqq] = 1.0
+
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1,2,1) 
+    librosa.display.specshow(z.T, y_axis='cqt_hz', x_axis='time')
+    plt.colorbar()
+    plt.title("Ground truth")
+
     p = model.predict(np.array(Spec.T))
-    librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time', cmap='magma')
+    plt.subplot(1,2,2) 
+    librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time')
+    plt.colorbar()
     plt.title("Prediction for %s" % filename)
-    plt.colorbar(format='%+2.0f dB')
     plt.show()
