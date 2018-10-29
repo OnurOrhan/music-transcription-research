@@ -150,31 +150,38 @@ def testFile(filename): # Test the given file
     D = np.abs(librosa.cqt(data, sr=sampleRate, fmin=FREF, n_bins=BINS))
     Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min)
 
+    plt.figure(figsize=(12, 10))
+    plt.subplot(2,2,1) 
     librosa.display.specshow(Spec, y_axis='cqt_hz', x_axis='time', cmap='magma')
     plt.title("Spectrogram of %s" % filename)
     plt.colorbar(format='%+2.0f dB')
-    plt.show()
 
-    ipd.Audio(filename)
-
-    z = np.zeros([len(data), 88])
+    frames = round(len(data)/512)
+    z = np.zeros([frames, 88])
     with open("%s.txt" % filename.split('.')[0]) as f:
         for line in f:
             (i1, i2, i3) = line.split()
             (a, b, c) = (float(i1), float(i2), float(i3))
             freqq = freq2Index(a)
-            for j in range(round(sampleRate*b), round(sampleRate*c)):
+            for j in range(round(sampleRate*b/512), round(sampleRate*c/512)):
                 z[j, freqq] = 1.0
 
-    plt.figure(figsize=(12, 4))
-    plt.subplot(1,2,1) 
+    plt.subplot(2,2,2) 
     librosa.display.specshow(z.T, y_axis='cqt_hz', x_axis='time')
     plt.colorbar()
-    plt.title("Ground truth")
+    plt.title("Ground Truth")
 
     p = model.predict(np.array(Spec.T))
-    plt.subplot(1,2,2) 
+    plt.subplot(2,2,3)
     librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time')
     plt.colorbar()
-    plt.title("Prediction for %s" % filename)
+    plt.title("Probabilities")
+
+    pp = np.zeros(p.shape)
+    for i in range(p.shape[0]):
+        pp[i, p[i].argmax()] = 1
+    plt.subplot(2,2,4)
+    librosa.display.specshow(pp.T, y_axis='cqt_hz', x_axis='time')
+    plt.colorbar()
+    plt.title("Predictions")
     plt.show()
