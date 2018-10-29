@@ -102,7 +102,7 @@ def freq2Index(freq):
 def index2Freq(index): # Converting the vector index into cents
     return fbins[index]
     
-def probVector(freq): # One-Hot frequency probability vector
+def probVector(freq): # Gaussian probability vector
     c = np.zeros(BINS)
 
     for i in range(BINS):
@@ -112,7 +112,7 @@ def probVector(freq): # One-Hot frequency probability vector
 
 def initData():
     global freqs
-    with open("source/guitar/freqs.txt") as f:
+    with open("source/freqs.txt") as f:
         for line in f:
             (key, val) = line.split()
             freqs[key] = float(val)      
@@ -166,11 +166,8 @@ def modelInit():
     global model
 
     if model is None:
-        # Sequential model de denenebilir
         a = Input(shape=(BINS,), name='input', dtype='float32')
-        #b = Reshape(target_shape=(BINS,), name='input-reshape')(a)
-        
-        # Sigmoid yerine relu?
+                
         b = Dense(BINS, activation="relu", name="dense")(a)
         b = Dropout(0.15, name="dropout")(b)
         b = Dense(BINS, activation="sigmoid", name="dense2")(b)
@@ -217,7 +214,7 @@ def testFile(filename, freq):
     plt.tight_layout()
     plt.show()
 
-    ipd.Audio("source/alla_turca.wav")
+    ipd.Audio(filename)
 
     p = model.predict(np.array(Spec.T))
     librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time', cmap='magma')
