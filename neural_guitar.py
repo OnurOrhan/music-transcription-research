@@ -9,7 +9,7 @@ from numpy.lib.stride_tricks import as_strided
 import matplotlib.pyplot as plt
 import librosa.display
 #import IPython.display as ipd
-# Reference #9: https://www.kaggle.com/asparago/simple-pitch-detector  
+# Reference [b]: https://www.kaggle.com/asparago/simple-pitch-detector  
 
 model = None
 trainx, trainy = ([], [])

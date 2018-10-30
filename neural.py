@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import librosa.display
 import IPython.display as ipd
 #import IPython.display as ipd
-# Reference #12: Classical MIDI Files, https://www.mfiles.co.uk/classical-midi.htm
+# Reference [d]: Classical MIDI Files, https://www.mfiles.co.uk/classical-midi.htm
 
 model = None
 history = None
@@ -108,8 +108,8 @@ def initData(): # Initialize the training and validation data
         sampleWav(files[rand[j]], 1) # Add samples for the validation set
     
     os.chdir("../..")
-    print("Training samples: %d" % trainx.shape)
-    print("Validation samples: %d" % validx.shape)
+    print("Training samples: %d" % trainx.shape[0])
+    print("Validation samples: %d" % validx.shape[0])
     if np.isnan(trainx).any():
         print("Trainx has a NaN value!")
     if np.isnan(trainy).any():
@@ -125,7 +125,6 @@ def modelClear(): # Clear the network model
 
 def modelInit(): # Initialize the network model
     global model
-
     if model is None:
         a = Input(shape=(BINS,), name='input', dtype='float32')
         
@@ -141,23 +140,23 @@ def modelInit(): # Initialize the network model
 def modelSummary(): # Summarize the network model
     model.summary()
 
-def modelFit(e=100, b=32, v=1):
-    model.fit(x=trainx, y=trainy, epochs=e, batch_size=b, verbose=v, validation_data=(validx, validy))
-    history = model.fit(x, y, validation_split=0.25, epochs=50, batch_size=16, verbose=1)
+def modelFit(e=32, b=32, v=1):
+    global history
+    history = model.fit(x=trainx, y=trainy, epochs=e, batch_size=b, verbose=v, validation_data=(validx, validy))
 
 def plotModel():
     global model
     if model is not None:
         plot_model(model, to_file='model.png')
-        ipd.Image('model.png')
 
 def plotHistory():
+    global history
     plt.plot(history.history['acc']) # Plot accuracy values
     plt.plot(history.history['val_acc'])
     plt.title('Model Accuracy')
     plt.ylabel('Accuracy')
     plt.xlabel('Epoch')
-    plt.legend(['Train', 'Test'], loc='upper left')
+    plt.legend(['Train', 'Validation'], loc='lower right')
     plt.show()
 
     plt.plot(history.history['loss']) # Plot loss values
@@ -165,7 +164,7 @@ def plotHistory():
     plt.title('Model Loss')
     plt.ylabel('Loss')
     plt.xlabel('Epoch')
-    plt.legend(['Train', 'Test'], loc='upper left')
+    plt.legend(['Train', 'Validation'], loc='upper right')
     plt.show()
 
 def modelLoadWeights(filename): # Load model weights from file
