@@ -192,6 +192,29 @@ def testFile(filename): # Test the given file
         pp[i, p[i].argmax()] = 1
     plt.subplot(2,2,4)
     librosa.display.specshow(pp.T, y_axis='cqt_hz', x_axis='time')
+    plt.title("Predictions")
+    plt.show()
+
+def testFileQuick(filename): # Test the given file
+    data, sampleRate = librosa.load(filename)
+    D = np.abs(librosa.cqt(data, sr=sampleRate, fmin=FREF, n_bins=BINS))
+    Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min)
+    librosa.display.specshow(Spec, y_axis='cqt_hz', x_axis='time', cmap='magma')
+    plt.title("Spectrogram of %s" % filename)
+    plt.colorbar(format='%+2.0f dB')
+    plt.show()
+
+    p = model.predict(np.array(Spec.T))
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1,2,1)
+    librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time')
     plt.colorbar()
+    plt.title("Probabilities")
+
+    pp = np.zeros(p.shape)
+    for i in range(p.shape[0]):
+        pp[i, p[i].argmax()] = 1
+    plt.subplot(1,2,2)
+    librosa.display.specshow(pp.T, y_axis='cqt_hz', x_axis='time')
     plt.title("Predictions")
     plt.show()
