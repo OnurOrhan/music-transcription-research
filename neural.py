@@ -5,13 +5,16 @@ import math
 import random
 from keras.layers import *
 from keras.models import Model
+from keras.utils import plot_model
 from numpy.lib.stride_tricks import as_strided  
 import matplotlib.pyplot as plt
 import librosa.display
+import IPython.display as ipd
 #import IPython.display as ipd
 # Reference #12: Classical MIDI Files, https://www.mfiles.co.uk/classical-midi.htm
 
 model = None
+history = None
 trainx, trainy = ([], [])
 validx, validy = ([], [])
 
@@ -140,6 +143,30 @@ def modelSummary(): # Summarize the network model
 
 def modelFit(e=100, b=32, v=1):
     model.fit(x=trainx, y=trainy, epochs=e, batch_size=b, verbose=v, validation_data=(validx, validy))
+    history = model.fit(x, y, validation_split=0.25, epochs=50, batch_size=16, verbose=1)
+
+def plotModel():
+    global model
+    if model is not None:
+        plot_model(model, to_file='model.png')
+        ipd.Image('model.png')
+
+def plotHistory():
+    plt.plot(history.history['acc']) # Plot accuracy values
+    plt.plot(history.history['val_acc'])
+    plt.title('Model Accuracy')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    plt.show()
+
+    plt.plot(history.history['loss']) # Plot loss values
+    plt.plot(history.history['val_loss'])
+    plt.title('Model Loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    plt.show()
 
 def modelLoadWeights(filename): # Load model weights from file
     global model
@@ -161,9 +188,10 @@ def testFile(filename): # Test the given file
     Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min)
 
     plt.figure(figsize=(12, 10))
+    plt.suptitle(filename)
     plt.subplot(2,2,1) 
     librosa.display.specshow(Spec, y_axis='cqt_hz', x_axis='time', cmap='magma')
-    plt.title("Spectrogram of %s" % filename)
+    plt.title("Spectrogram", fontweight='bold')
     plt.colorbar(format='%+2.0f dB')
 
     frames = round(len(data)/512)
@@ -178,21 +206,20 @@ def testFile(filename): # Test the given file
 
     plt.subplot(2,2,2) 
     librosa.display.specshow(z.T, y_axis='cqt_hz', x_axis='time')
-    plt.colorbar()
-    plt.title("Ground Truth")
+    plt.title("Ground Truth", fontweight='bold')
 
     p = model.predict(np.array(Spec.T))
     plt.subplot(2,2,3)
     librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time')
     plt.colorbar()
-    plt.title("Probabilities")
+    plt.title("Probabilities", fontweight='bold')
 
     pp = np.zeros(p.shape)
     for i in range(p.shape[0]):
         pp[i, p[i].argmax()] = 1
     plt.subplot(2,2,4)
     librosa.display.specshow(pp.T, y_axis='cqt_hz', x_axis='time')
-    plt.title("Predictions")
+    plt.title("Predictions", fontweight='bold')
     plt.show()
 
 def testFileQuick(filename): # Test the given file
@@ -200,7 +227,7 @@ def testFileQuick(filename): # Test the given file
     D = np.abs(librosa.cqt(data, sr=sampleRate, fmin=FREF, n_bins=BINS))
     Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min)
     librosa.display.specshow(Spec, y_axis='cqt_hz', x_axis='time', cmap='magma')
-    plt.title("Spectrogram of %s" % filename)
+    plt.title("Spectrogram of %s" % filename, fontweight='bold')
     plt.colorbar(format='%+2.0f dB')
     plt.show()
 
@@ -209,12 +236,13 @@ def testFileQuick(filename): # Test the given file
     plt.subplot(1,2,1)
     librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time')
     plt.colorbar()
-    plt.title("Probabilities")
+    plt.title("Probabilities", fontweight='bold')
 
     pp = np.zeros(p.shape)
     for i in range(p.shape[0]):
         pp[i, p[i].argmax()] = 1
     plt.subplot(1,2,2)
     librosa.display.specshow(pp.T, y_axis='cqt_hz', x_axis='time')
-    plt.title("Predictions")
+    plt.colorbar()
+    plt.title("Predictions", fontweight='bold')
     plt.show()

@@ -10,7 +10,7 @@ def demonstration():
     transitions.append(dict())
     c = 0
 
-    os.chdir("source/guitar_midi")
+    os.chdir("source/piano_mono_midi")
     for file in glob.glob("*.mid"):
         c += 1
         pm = pretty_midi.PrettyMIDI(file)
@@ -57,8 +57,8 @@ def demonstration():
     x = np.linspace(-25, 25, 100)
     y = np.exp(-np.square(x-mean)/(2*var)) / (np.sqrt(2*np.pi*var))
 
-    plt.figure(figsize=(12, 4))
-    plt.subplot(1,2,1)   
+    #plt.figure(figsize=(12, 4))
+    #plt.subplot(1,2,1)   
     plt.ylim(0,0.16)
     plt.bar(transitions[1].keys(), transitions[1].values(), alpha=0.6)
     plt.bar(transitions[2].keys(), transitions[2].values(), color='r', alpha=0.6)
@@ -68,9 +68,10 @@ def demonstration():
     plt.xlim(-25,25)
     plt.xlabel('Transition Step Size')
     plt.ylabel('Probability')
-    plt.title('All Pitch Transition Probabilities')
+    plt.title('Piano Pitch Transition Probabilities')
+    plt.show()
 
-    plt.subplot(1,2,2)
+    #plt.subplot(1,2,2)
     #plt.plot(x, norm.pdf(x, mean, std))
     plt.plot(x,y, 'r_')
     plt.bar(transitions[0].keys(), transitions[0].values(), color='#A01010')
@@ -78,5 +79,5 @@ def demonstration():
     plt.xlim(-25,25)
     plt.xlabel('Transition Step Size')
     plt.ylabel('Probability')
-    plt.title('Average Pitch Transition Probabilities')
+    plt.title('Average Probabilities')
     plt.show()
