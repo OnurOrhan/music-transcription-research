@@ -10,8 +10,12 @@ for file in glob.glob("*.mid"):
 print("Done synthesizing audio!")
     
     # -----
+    # 5:51 example:
+     
     # 27.00 sec (Timidity) MIDI --> MP3
-    # -----
+     
+    # or
+
     # 04.30 sec (Timidity) MIDI --> WAV
     # 15.00 sec (FFmpeg) WAV --> MP3
     # 19.30 sec (Total) MIDI --> MP3

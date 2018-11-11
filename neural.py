@@ -3,6 +3,8 @@ import librosa
 import numpy as np
 import math
 import random
+import re
+import pretty_midi
 from keras.layers import *
 from keras.models import Model
 from keras.utils import plot_model
@@ -38,7 +40,11 @@ def sampleWav(filename, type=0):
             (i1, i2, i3) = line.split()
             (a, b, c) = (float(i1), float(i2), float(i3))
             y = data[round(Sr*b) : round(Sr*c)]
-            D = np.abs(librosa.cqt(y, sr=Sr, fmin=FREF, n_bins=BINS))
+            try:
+                D = np.abs(librosa.cqt(y, sr=Sr, fmin=FREF, n_bins=BINS))
+            except:
+                print("Could not apply CQT. Window length: %d" % len(y))
+                continue
             Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min).T
             pV = np.tile( probVector(a), (len(Spec),1) )
 
@@ -67,18 +73,28 @@ def freq2Index(freq): # Convert frequency to its frequency bin index
         return round(math.log2(freq/FREF) * 12)
 
 def midinote2Index(mid): # Convert piano midi note to cqt frequency bin index
-# MIDI: 21-108
-# CQT: 0-87
+# MIDI interval 21-108 corresponds to: CQT indexes 0-87
     if mid < 22:
         return 0
     elif mid > 107:
         return 87
     else:
         return mid - 21
+
+def index2Midinote(i):
+    return i+21
     
 def index2Freq(index): # Converting the vector index into cents
     return fbins[index]
+
+#def getSpecFrame(frame, sr): # Getting spectrum frame index, given the time-domain frame index
+#    return 
     
+def oneHotVector(freq): # One-hot probability vector
+    c = np.zeros(BINS)
+    c[freq2Index(freq)] = 1
+    return c
+
 def probVector(freq): # Gaussian probability vector
     c = np.zeros(BINS)
 
@@ -106,10 +122,12 @@ def initData(): # Initialize the training and validation data
     for j in range(n_train, total):
         print("[%d/%d] %s..." % (j-n_train+1, total-n_train, files[rand[j]]))
         sampleWav(files[rand[j]], 1) # Add samples for the validation set
-    
+
+    print("\nTraining samples: %d" % len(trainx))
+    print("Validation samples: %d\n" % len(validx))
+
     os.chdir("../..")
-    print("Training samples: %d" % trainx.shape[0])
-    print("Validation samples: %d" % validx.shape[0])
+
     if np.isnan(trainx).any():
         print("Trainx has a NaN value!")
     if np.isnan(trainy).any():
@@ -119,19 +137,36 @@ def initData(): # Initialize the training and validation data
     if np.isnan(validy).any():
         print("Validy has a NaN value!")
 
+def saveData():
+    print("Saving data...")
+    np.save("data/trainx.npy", trainx)
+    np.save("data/trainy.npy", trainy)
+    np.save("data/validx.npy", validx)
+    np.save("data/validy.npy", validy)
+    print("Data saved...")
+
+def loadData():
+    global trainx, trainy, validx, validy
+    print("Loading data...")
+    trainx = np.load("trainx.npy")
+    trainy = np.load("trainy.npy")
+    validx = np.load("validx.npy")
+    validy = np.load("validy.npy")
+    print("Data loaded...")
+
 def modelClear(): # Clear the network model
     global model
     model = None
 
-def modelInit(): # Initialize the network model
+def modelInit(dropouts=[0.15, 0.15]): # Initialize the network model
     global model
     if model is None:
         a = Input(shape=(BINS,), name='input', dtype='float32')
         
         b = Dense(BINS, activation="relu", name="dense")(a)
-        b = Dropout(0.15, name="dropout")(b)
+        b = Dropout(dropouts[0], name="dropout")(b)
         b = Dense(BINS, activation="sigmoid", name="dense2")(b)
-        b = Dropout(0.15, name="dropout2")(b)
+        b = Dropout(dropouts[1], name="dropout2")(b)
         b = Dense(BINS, activation="softmax", name="classifier")(b)
 
         model = Model(inputs=a, outputs=b)
@@ -193,14 +228,14 @@ def testFile(filename): # Test the given file
     plt.title("Spectrogram", fontweight='bold')
     plt.colorbar(format='%+2.0f dB')
 
-    frames = round(len(data)/512)
+    frames = int(len(data)/512)
     z = np.zeros([frames, 88])
     with open("%s.txt" % filename.split('.')[0]) as f:
         for line in f:
             (i1, i2, i3) = line.split()
             (a, b, c) = (float(i1), float(i2), float(i3))
             freqq = freq2Index(a)
-            for j in range(round(sampleRate*b/512), round(sampleRate*c/512)):
+            for j in range(int(sampleRate*b/512), int(sampleRate*c/512)):
                 z[j, freqq] = 1.0
 
     plt.subplot(2,2,2) 
@@ -209,17 +244,36 @@ def testFile(filename): # Test the given file
 
     p = model.predict(np.array(Spec.T))
     plt.subplot(2,2,3)
-    librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time')
+    librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time', label='Probabilities')
     plt.colorbar()
     plt.title("Probabilities", fontweight='bold')
 
+    # First split into note segments, by detecting onsets
+    oenv = librosa.onset.onset_strength(y=data, sr=sampleRate)
+    onsets = librosa.onset.onset_detect(onset_envelope=oenv, backtrack=False)
+    onsets = np.append(onsets, p.shape[0]-1)
+
+    notes, starts, ends = ([], [], [])
     pp = np.zeros(p.shape)
-    for i in range(p.shape[0]):
-        pp[i, p[i].argmax()] = 1
+    for i in range(len(onsets)-1):
+        a = onsets[i]
+        b = onsets[i+1]
+        guesses = np.sum(p[a:b,:], axis=0)
+        c = guesses.argmax()
+        
+        for j in range(a, b):
+            pp[j, c] = 1
+
+        starts.append(a*512/sampleRate)
+        ends.append(b*512/sampleRate)
+        notes.append(c+21)
+
     plt.subplot(2,2,4)
     librosa.display.specshow(pp.T, y_axis='cqt_hz', x_axis='time')
     plt.title("Predictions", fontweight='bold')
     plt.show()
+
+    createMidi(notes, starts, ends, filename)
 
 def testFileQuick(filename): # Test the given file
     data, sampleRate = librosa.load(filename)
@@ -237,11 +291,42 @@ def testFileQuick(filename): # Test the given file
     plt.colorbar()
     plt.title("Probabilities", fontweight='bold')
 
+    # First split into note segments, by detecting onsets
+    oenv = librosa.onset.onset_strength(y=data, sr=sampleRate)
+    onsets = librosa.onset.onset_detect(onset_envelope=oenv, backtrack=False)
+    onsets = np.append(onsets, p.shape[0]-1)
+
+    notes, starts, ends = ([], [], [])
     pp = np.zeros(p.shape)
-    for i in range(p.shape[0]):
-        pp[i, p[i].argmax()] = 1
+    for i in range(len(onsets)-1):
+        a = onsets[i]
+        b = onsets[i+1]
+        guesses = np.sum(p[a:b,:], axis=0)
+        c = guesses.argmax()
+
+        for j in range(a, b):
+            pp[j, c] = 1
+
+        starts.append(a*512/sampleRate)
+        ends.append(b*512/sampleRate)
+        notes.append(c+21)
+
     plt.subplot(1,2,2)
     librosa.display.specshow(pp.T, y_axis='cqt_hz', x_axis='time')
     plt.colorbar()
     plt.title("Predictions", fontweight='bold')
     plt.show()
+
+    createMidi(notes, starts, ends, filename)
+
+def createMidi(notes, onsets, offsets, filename):
+    piano_midi = pretty_midi.PrettyMIDI()
+    piano_program = pretty_midi.instrument_name_to_program('Acoustic Grand Piano')
+    piano = pretty_midi.Instrument(program=piano_program) # Create a piano instrument
+    
+    for n, s, e in zip(notes, onsets, offsets):
+        note = pretty_midi.Note(velocity=100, pitch=n, start=s, end=e)
+        piano.notes.append(note)
+        
+    piano_midi.instruments.append(piano) # Append the piano instrument to the midi file
+    piano_midi.write("out_midis/%s.mid" % (re.findall(r"[\w]+", filename)[-2]))

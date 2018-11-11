@@ -6,6 +6,12 @@ __pycache__/
 *.py[cod]
 
 # MP3 files
-*.mp3
+mono-*.mp3
 
+# Data files (training and validation vectors)
+*.npy
+
+test.txt
+test.py
+test.png
 guitarWeights
