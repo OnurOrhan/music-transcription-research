@@ -1,6 +1,7 @@
 import glob, os
 
-os.chdir("source/piano_mono_midi")
+#os.chdir("source/piano_mono_midi")
+os.chdir("out_midis")
 for file in glob.glob("*.mid"):
     filename = file.split('.mid')[0]
     print("Processing %s..." % filename)
