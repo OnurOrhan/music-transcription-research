@@ -24,24 +24,28 @@ FREF = librosa.note_to_hz('A0')  # Reference frequency = 27.50 Hz -> A0
 # For 84 frequency bins:
 # FREF = librosa.note_to_hz('C1')  # Reference frequency = 32.70 Hz -> C1
 
+hPi = np.zeros(BINS) # HMM Initial state (note) probabilities
+hSteps = np.zeros(BINS*2-1) # Transition steps
+hA = np.zeros([BINS, BINS]) # Transition matrix
+hB = np.zeros([BINS, BINS]) # Emission matrix
+
 fbins = librosa.cqt_frequencies(BINS, fmin=FREF)
 FMAX = fbins[BINS-1]
 STD = 25 # Standard deviation for the probability vector
 
 def sampleWav(filename, type=0):
-    global trainx, trainy, validx, validy
+    global trainx, trainy, validx, validy, hPi, hSteps
     
     data, Sr = librosa.load("%s.mp3" % filename)
     with open("%s.txt" % filename) as f:
         for line in f:
             (i1, i2, i3) = line.split()
             (a, b, c) = (float(i1), float(i2), float(i3))
-
             y = data[round(Sr*b) : round(Sr*c)]
+
             try:
                 D = np.abs(librosa.cqt(y, sr=Sr, fmin=FREF, n_bins=BINS))
             except:
-                print("Could not apply CQT. Window length: %d" % len(y))
                 continue
             Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min).T
             pV = np.tile( probVector(a), (len(Spec),1) )
@@ -60,7 +64,6 @@ def sampleWav(filename, type=0):
                 else:
                     validx = np.append(validx, Spec, axis=0)
                     validy = np.append(validy, pV, axis=0)
-    return
 
 def freq2Index(freq): # Convert frequency to its frequency bin index
     if freq < FREF:
@@ -125,7 +128,6 @@ def initData(): # Initialize the training and validation data
     print("Validation samples: %d\n" % len(validx))
 
     os.chdir("../..")
-
     if np.isnan(trainx).any():
         print("Trainx has a NaN value!")
     if np.isnan(trainy).any():
@@ -135,22 +137,114 @@ def initData(): # Initialize the training and validation data
     if np.isnan(validy).any():
         print("Validy has a NaN value!")
 
+    initTransitions()
+    initEmissions()
+    normalize()
+
 def saveData():
     print("Saving data...")
     np.save("data/trainx.npy", trainx)
     np.save("data/trainy.npy", trainy)
     np.save("data/validx.npy", validx)
     np.save("data/validy.npy", validy)
-    print("Data saved...")
+    np.save("data/hPi.npy", hPi)
+    np.save("data/hSteps.npy", hSteps)
+    np.save("data/hA.npy", hA)
+    np.save("data/hB.npy", hB)
+    print("Data saved!")
 
-def loadData():
+def loadTrainData():
     global trainx, trainy, validx, validy
     print("Loading data...")
     trainx = np.load("data/trainx.npy")
     trainy = np.load("data/trainy.npy")
     validx = np.load("data/validx.npy")
     validy = np.load("data/validy.npy")
-    print("Data loaded...")
+    print("Data loaded!")
+
+def loadAllData():
+    global trainx, trainy, validx, validy, hPi, hSteps, hA, hB
+    print("Loading data...")
+    trainx = np.load("data/trainx.npy")
+    trainy = np.load("data/trainy.npy")
+    validx = np.load("data/validx.npy")
+    validy = np.load("data/validy.npy")
+    hPi = np.load("data/hPi.npy")
+    hSteps = np.load("data/hSteps.npy")
+    hA = np.load("data/hA.npy")
+    hB = np.load("data/hB.npy")
+    print("Data loaded!")
+
+def initTransitions():
+    global hPi, hSteps, hA
+
+    hPi = np.zeros(BINS)
+    hSteps = np.zeros(BINS*2-1)
+    hA = np.zeros([BINS, BINS])
+
+    os.chdir("source/piano_mono_midi")
+    for file in glob.glob("*.mid"):
+        filename = file.split(".mid")[0]
+        j = -1
+
+        with open("%s.txt" % filename) as f:
+            for line in f:
+                (i1, i2, i3) = line.split()
+                (a, b, c) = (float(i1), float(i2), float(i3))
+                
+                k = freq2Index(a)
+                hPi[k] += 1
+                if(j > -1):
+                    difr = k - j
+                    hSteps[difr+BINS-1] += 1
+                j = k
+    os.chdir("../..")
+
+    hSteps += 1.0e-9
+    hSteps = hSteps / np.sum(hSteps)
+    initHA()
+    
+    print("Transition Matrix Complete!\n")
+
+def initHA():
+    global hA
+    for i in range(BINS):
+        hA[i] = hSteps[BINS-1-i : 2*BINS-1-i]
+
+def initEmissions():
+    global hB
+
+    hB = np.zeros((BINS, BINS))
+    print("Working on the Emission Matrix...")
+
+    print("Predicting the training set...")
+    T = model.predict(trainx)
+    for i, x in enumerate(T):
+        k = trainy[i].argmax()
+        hB[k] += x
+
+    print("Predicting the validation set...")
+    V = model.predict(validx)
+    for i, y in enumerate(V):
+        k = validy[i].argmax()
+        hB[k] += y
+
+    print("Emission Matrix Complete!\n")
+
+def normalize(): # Normalize all the probability matrices
+    global hPi, hA, hB
+
+    hPi += 1.0e-9
+    hPi = hPi / np.sum(hPi)
+
+    hA += 1.0e-9
+    hA = hA / np.sum(hA)
+
+    hB += 1.0e-9
+    sumB = np.sum(hB, axis=1)
+    hB = hB/np.tile(sumB, (BINS,1)).T
+
+    print("Normalized all matrices!\n")
 
 def modelClear(): # Clear the network model
     global model
@@ -248,25 +342,58 @@ def testFile(filename): # Test the given file
     plt.colorbar()
     plt.title("Predictions", fontweight='bold')
 
-    # First split into note segments, by detecting onsets
+     # First split into note segments, by detecting onsets
     oenv = librosa.onset.onset_strength(y=data, sr=sampleRate)
     onsets = librosa.onset.onset_detect(onset_envelope=oenv, backtrack=True)
     onsets = np.append(onsets, [p.shape[0]-1])
+    length = len(onsets)-1
 
     notes, starts, ends = ([], [], [])
-    pp = np.multiply(np.tile(np.sum(pp, axis=1), (BINS, 1)).T, p)
-    tran = np.zeros(p.shape)
-    for i in range(len(onsets)-1):
+    p = np.multiply(np.tile(np.sum(pp, axis=1), (BINS, 1)).T, p)
+    
+    back = np.zeros((length, BINS)) # Backtracking matrix
+    prob = np.zeros((length, BINS)) # State Probabilities
+
+    for i in range(length): # Viterbi Algorithm
         a = onsets[i]
         b = onsets[i+1]
-        guesses = np.sum(pp[a:b,:], axis=0)
+        guesses = np.sum(p[a:b,:], axis=0)
         c = guesses.argmax()
-        
-        for j in range(a, b):
-            tran[j, c] = 1
+
+        if i == 0: # The first note of the piece
+            temp = np.multiply(hPi, hB[:, c])
+            temp = temp / np.sum(temp)
+            prob[0] = temp
+        else: # The following notes in the piece
+            for j in range(BINS):
+                transitions = np.multiply(prob[i-1], hA[:, j])*hB[j, c]
+                transitions = transitions / np.sum(transitions)
+                index = transitions.argmax()
+                back[i, j] = index
+                prob[i, j] = transitions[index]             
 
         starts.append(a*512/sampleRate)
         ends.append(b*512/sampleRate)
+
+    tran = np.zeros(p.shape)
+    current = prob[length-1].argmax()
+    tracking = np.array([current])
+    
+    for i in range(length-1): # Backtrack after Viterbi
+        index = length-1-i
+        
+        temp = back[index, int(current)]
+        tracking = np.insert(tracking, 0, temp)
+        current = temp
+
+    for i in range(length): # The final decision
+        a = onsets[i]
+        b = onsets[i+1]
+        c = tracking[i]
+
+        for j in range(a, b):
+            tran[j, c] = 1
+
         notes.append(c+21)
 
     plt.subplot(2,2,4)
@@ -280,48 +407,75 @@ def testFileQuick(filename): # Test the given file
     data, sampleRate = librosa.load(filename)
     D = np.abs(librosa.cqt(data, sr=sampleRate, fmin=FREF, n_bins=BINS))
     Spec = librosa.amplitude_to_db(librosa.magphase(D)[0], ref=np.min)
-    pp = Spec.T
-    p = model.predict(np.array(pp))
-
-    # First split into note segments, by detecting onsets
-    oenv = librosa.onset.onset_strength(y=data, sr=sampleRate)
-    times = librosa.frames_to_time(np.arange(len(oenv)), sr=sampleRate)
-    onsets = librosa.onset.onset_detect(onset_envelope=oenv, sr=sampleRate)
-    onsets = np.append(onsets, [p.shape[0]-1])
-
-    plt.figure(figsize=(12, 10))
-    ax1 = plt.subplot(2, 2, 1)
     librosa.display.specshow(Spec, y_axis='cqt_hz', x_axis='time', cmap='magma')
-    plt.title("Power spectrogram of %s" % filename, fontweight='bold')
-  
-    plt.subplot(2, 2, 3, sharex=ax1)
-    plt.plot(times, oenv, label='Onset Strength')
-    plt.vlines(times[onsets], 0, oenv.max(), color='r', alpha=0.9, linestyle='--', label='Onsets')
-    plt.axis('tight')
-    plt.legend(frameon=True, framealpha=0.75)
-    
-    plt.subplot(2, 2, 2)
+    plt.title("Spectrogram of %s" % filename, fontweight='bold')
+    plt.colorbar(format='%+2.0f dB')
+    plt.show()
+
+    pp = Spec.T
+
+    p = model.predict(np.array(pp))
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1,2,1)
     librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time')
     plt.colorbar()
     plt.title("Predictions", fontweight='bold')
 
+     # First split into note segments, by detecting onsets
+    oenv = librosa.onset.onset_strength(y=data, sr=sampleRate)
+    onsets = librosa.onset.onset_detect(onset_envelope=oenv, backtrack=True)
+    onsets = np.append(onsets, [p.shape[0]-1])
+    length = len(onsets)-1
+
     notes, starts, ends = ([], [], [])
-    pp = np.multiply(np.tile(np.sum(pp, axis=1), (BINS, 1)).T, p)
-    tran = np.zeros(p.shape)
-    for i in range(len(onsets)-1):
+    p = np.multiply(np.tile(np.sum(pp, axis=1), (BINS, 1)).T, p)
+    
+    back = np.zeros((length, BINS)) # Backtracking matrix
+    prob = np.zeros((length, BINS)) # State Probabilities
+
+    for i in range(length): # Viterbi Algorithm
         a = onsets[i]
         b = onsets[i+1]
-        guesses = np.sum(pp[a:b,:], axis=0)
+        guesses = np.sum(p[a:b,:], axis=0)
         c = guesses.argmax()
+
+        if i == 0: # The first note of the piece
+            temp = np.multiply(hPi, hB[:, c])
+            temp = temp / np.sum(temp)
+            prob[0] = temp
+        else: # The following notes in the piece
+            for j in range(BINS):
+                transitions = np.multiply(prob[i-1], hA[:, j])*hB[j, c]
+                transitions = transitions / np.sum(transitions)
+                index = transitions.argmax()
+                back[i, j] = index
+                prob[i, j] = transitions[index]   
+
+        starts.append(a*512/sampleRate)
+        ends.append(b*512/sampleRate)
+
+    tran = np.zeros(p.shape)
+    current = prob[length-1].argmax()
+    tracking = np.array([current])
+    
+    for i in range(length-1): # Backtrack after Viterbi
+        index = length-1-i
+        
+        temp = back[index, int(current)]
+        tracking = np.insert(tracking, 0, temp)
+        current = temp
+
+    for i in range(length): # The final decision
+        a = onsets[i]
+        b = onsets[i+1]
+        c = tracking[i]
 
         for j in range(a, b):
             tran[j, c] = 1
 
-        starts.append(a*512/sampleRate)
-        ends.append(b*512/sampleRate)
         notes.append(c+21)
 
-    plt.subplot(2, 2, 4)
+    plt.subplot(1,2,2)
     librosa.display.specshow(tran.T, y_axis='cqt_hz', x_axis='time')
     plt.colorbar()
     plt.title("Transcription", fontweight='bold')

@@ -11,7 +11,7 @@ mono-*.mp3
 # Data files (training and validation vectors)
 *.npy
 
+midi2mp3.py
 test.txt
 test.py
 test.png
-guitarWeights
