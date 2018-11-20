@@ -7,6 +7,7 @@ import re
 import pretty_midi
 from keras.layers import *
 from keras.models import Model
+from keras import optimizers
 from keras.utils import plot_model
 from numpy.lib.stride_tricks import as_strided  
 import matplotlib.pyplot as plt
@@ -161,19 +162,19 @@ def modelInit(dropouts=[0.15, 0.15]): # Initialize the network model
     if model is None:
         a = Input(shape=(BINS,), name='input', dtype='float32')
         
-        b = Dense(BINS*3-2, activation="relu", name="dense")(a)
-        b = Dropout(dropouts[0], name="dropout")(b)
+        b = Dense(BINS*5, activation="relu", name="dense1")(a)
+        b = Dropout(dropouts[0], name="dropout1")(b)
         b = Dense(BINS*3-2, activation="sigmoid", name="dense2")(b)
         b = Dropout(dropouts[1], name="dropout2")(b)
         b = Dense(BINS, activation="softmax", name="classifier")(b)
 
         model = Model(inputs=a, outputs=b)
-        model.compile('adam', 'binary_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['accuracy'])
 
 def modelSummary(): # Summarize the network model
     model.summary()
 
-def modelFit(e=32, b=32, v=1):
+def modelFit(e=16, b=64, v=1):
     global history
     history = model.fit(x=trainx, y=trainy, epochs=e, batch_size=b, verbose=v, validation_data=(validx, validy))
 
@@ -250,7 +251,7 @@ def testFile(filename): # Test the given file
 
     # First split into note segments, by detecting onsets
     oenv = librosa.onset.onset_strength(y=data, sr=sampleRate)
-    onsets = librosa.onset.onset_detect(onset_envelope=oenv, backtrack=True)
+    onsets = librosa.onset.onset_detect(onset_envelope=oenv, sr=sampleRate)
     onsets = np.append(onsets, [p.shape[0]-1])
 
     notes, starts, ends = ([], [], [])
@@ -339,4 +340,4 @@ def createMidi(notes, onsets, offsets, filename):
         piano.notes.append(note)
         
     piano_midi.instruments.append(piano) # Append the piano instrument to the midi file
-    piano_midi.write("out_midis/%s.mid" % (re.findall(r"[\w\-\_]+[/\\]?", filename)[-2]))
+    piano_midi.write("out_midis/tr-%s.mid" % (re.findall(r"[\w\-\_]+[/\\]?", filename)[-2]))
