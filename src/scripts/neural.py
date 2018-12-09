@@ -103,7 +103,7 @@ def probVector(freq): # Gaussian probability vector
     return c
 
 def initData(): # Initialize the training and validation data
-    os.chdir("source/piano_mono_midi")
+    os.chdir("../midi/piano_mono_midi")
 
     files = []
     for file in glob.glob("*.mid"):
@@ -125,7 +125,7 @@ def initData(): # Initialize the training and validation data
     print("\nTraining samples: %d" % len(trainx))
     print("Validation samples: %d\n" % len(validx))
 
-    os.chdir("../..")
+    os.chdir("../../scripts")
 
     if np.isnan(trainx).any():
         print("Trainx has a NaN value!")
@@ -138,19 +138,19 @@ def initData(): # Initialize the training and validation data
 
 def saveData():
     print("Saving data...")
-    np.save("data/trainx.npy", trainx)
-    np.save("data/trainy.npy", trainy)
-    np.save("data/validx.npy", validx)
-    np.save("data/validy.npy", validy)
+    np.save("../data/trainx.npy", trainx)
+    np.save("../data/trainy.npy", trainy)
+    np.save("../data/validx.npy", validx)
+    np.save("../data/validy.npy", validy)
     print("Data saved...")
 
 def loadData():
     global trainx, trainy, validx, validy
     print("Loading data...")
-    trainx = np.load("data/trainx.npy")
-    trainy = np.load("data/trainy.npy")
-    validx = np.load("data/validx.npy")
-    validy = np.load("data/validy.npy")
+    trainx = np.load("../data/trainx.npy")
+    trainy = np.load("../data/trainy.npy")
+    validx = np.load("../data/validx.npy")
+    validy = np.load("../data/validy.npy")
     print("Data loaded...")
 
 def modelClear(): # Clear the network model
@@ -181,7 +181,7 @@ def modelFit(e=16, b=64, v=1):
 def plotModel():
     global model
     if model is not None:
-        plot_model(model, to_file='model.png')
+        plot_model(model, to_file='../figures/model.png')
 
 def plotHistory():
     global history
@@ -214,6 +214,24 @@ def modelSaveWeights(filename): # Save current model weights as a file
 
 def modelPredict(pred): # Make predictions for the given input spectrogram
     return model.predict(pred)
+
+def testNoteAccuracy():
+    a = len(trainx)
+    b = len(validx)
+
+    p = model.predict(trainx)
+    count = 0
+    for i, x in enumerate(p):
+        if trainy[i].argmax() == x.argmax():
+            count += 1
+    print("Training set: %d/%d correct. (%%%f)" % (count, a, 100.*count/a))
+
+    pp = model.predict(validx)
+    count2 = 0
+    for i, x in enumerate(pp):
+        if validy[i].argmax() == x.argmax():
+            count2 += 1
+    print("Validation set: %d / %d correct. (%%%f)" % (count2, b, 100.*count2/b))
 
 def testFile(filename): # Test the given file
     data, sampleRate = librosa.load(filename)
@@ -340,4 +358,4 @@ def createMidi(notes, onsets, offsets, filename):
         piano.notes.append(note)
         
     piano_midi.instruments.append(piano) # Append the piano instrument to the midi file
-    piano_midi.write("out_midis/tr-%s.mid" % (re.findall(r"[\w\-\_]+[/\\]?", filename)[-2]))
+    piano_midi.write("../../out_midis/tr-%s.mid" % (re.findall(r"[\w\-\_]+[/\\]?", filename)[-2]))

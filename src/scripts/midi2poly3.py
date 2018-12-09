@@ -3,7 +3,7 @@ import pretty_midi
 
 out_midis, out_names = ([], [])
 
-os.chdir("source/piano_midi")
+os.chdir("../midi/piano_midi")
 for file in glob.glob("*.mid"):
     pm = pretty_midi.PrettyMIDI(file)
     filename = file.split('.mid')[0]
@@ -13,10 +13,38 @@ for file in glob.glob("*.mid"):
     piano_program = pretty_midi.instrument_name_to_program('Acoustic Grand Piano')
     piano = pretty_midi.Instrument(program=piano_program) # Create a piano instrument
     
-    pitch, onset, offset = (-1, -1, -1)
+    p1, on1, of1 = (-1, -1, -1) # Last note in the  1st channel
+    p2, on2, of2 = (-1, -1, -1) # Last note in the  2nd channel
+    p3, on3, of3 = (-1, -1, -1) # Last note in the  3rd channel
+
     pm.instruments[0].notes.sort(key=lambda x: x.start, reverse=False)
     for note in pm.instruments[0].notes: # Append the notes to the piano instrument
-        if(note.start == onset): # If two notes start at the same time
+        start = note.start # The onset of the note
+        end = note.end # The offset of the note
+        pitch = note.pitch
+        
+        if end <= of1 and end <= of2 and end <= of3: # Skip this note
+            continue
+
+        if start >= of1: # Could go into the first slot
+            p1 = pitch
+            on1 = start
+            of1 = end
+            piano.notes.append(note)
+        elif start >= of2:
+            p2 = pitch
+            on2 = start
+            of2 = end
+            piano.notes.append(note)
+        elif start >= of3:
+            p3 = pitch
+            on3 = start
+            of3 = end
+            piano.notes.append(note)
+        else:
+            
+
+        """if(note.start == onset): # If two notes start at the same time
             if(note.pitch > pitch):
                 piano.notes[len(piano.notes)-1] = note # Select the note with the higher pitch
             else:
@@ -27,7 +55,7 @@ for file in glob.glob("*.mid"):
             piano.notes.append(note)
         pitch = note.pitch        
         onset = note.start
-        offset = note.end
+        offset = note.end"""
         
     for pb in pm.instruments[0].pitch_bends: # Append pitch bend events to the instrument
         piano.pitch_bends.append(pb)
@@ -36,7 +64,7 @@ for file in glob.glob("*.mid"):
         
     piano_midi.instruments.append(piano) # Append the piano instrument to the midi file
     out_midis.append(piano_midi)
-    out_names.append("mono-%s.mid" % filename)
+    out_names.append("poly-%s.mid" % filename)
 
 os.chdir("../piano_mono_midi") # Switch to the monophonic midi folder directory   
 for j, midi in enumerate(out_midis):
@@ -49,5 +77,5 @@ for j, midi in enumerate(out_midis):
         file.write("%s\n" % note.end) # Note offset
     file.close()
     
-os.chdir("../..")
+os.chdir("../../scripts")
 print("Done monophonisizing!")

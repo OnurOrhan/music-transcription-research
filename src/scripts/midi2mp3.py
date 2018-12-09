@@ -1,6 +1,6 @@
 import glob, os
 
-os.chdir("source/piano_mono_midi")
+os.chdir("../midi/piano_poly_midi")
 for file in glob.glob("*.mid"):
     filename = file.split('.mid')[0]
     print("Processing %s..." % filename)
@@ -9,8 +9,9 @@ for file in glob.glob("*.mid"):
     os.system("del /f %s.wav" % filename)
 print("Done synthesizing audio!")
     
-    # -----
-    # 5:51 example:
+    # /////
+    
+    # 351-second-example
      
     # 27.00 sec (Timidity) MIDI --> MP3
      
@@ -19,4 +20,5 @@ print("Done synthesizing audio!")
     # 04.30 sec (Timidity) MIDI --> WAV
     # 15.00 sec (FFmpeg) WAV --> MP3
     # 19.30 sec (Total) MIDI --> MP3
-    # -----
+
+    # /////

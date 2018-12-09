@@ -10,7 +10,7 @@ def demonstration():
     transitions.append(dict())
     c = 0
 
-    os.chdir("source/piano_mono_midi")
+    os.chdir("../midi/piano_mono_midi")
     for file in glob.glob("*.mid"):
         c += 1
         pm = pretty_midi.PrettyMIDI(file)

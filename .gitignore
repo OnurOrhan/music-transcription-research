@@ -7,11 +7,14 @@ __pycache__/
 
 # MP3 files
 mono-*.mp3
+poly-*.mp3
+
+src/midi/piano_chords
 
 # Data files (training and validation vectors)
 *.npy
 
-midi2mp3.py
-test.txt
+neuralChords.py
+neuralViterbi.py
+test_output.txt
 test.py
-test.png
