@@ -20,16 +20,14 @@ history = None
 trainx, trainy = ([], [])
 validx, validy = ([], [])
 
-BINS = 88
-FREF = librosa.note_to_hz('A0')  # Reference frequency = 27.50 Hz -> A0
-# For 84 frequency bins:
-# FREF = librosa.note_to_hz('C1')  # Reference frequency = 32.70 Hz -> C1
+BINS = 88 # Number of frequency bins, except for the silent note
+FREF = librosa.note_to_hz('A0')  # Reference frequency = 27.50 Hz (A0)
 
 fbins = librosa.cqt_frequencies(BINS, fmin=FREF)
 FMAX = fbins[BINS-1]
 STD = 25 # Standard deviation for the probability vector
 
-def sampleWav(filename):
+def sample(filename):
     global trainx, trainy, validx, validy
     
     data, Sr = librosa.load("%s.mp3" % filename)
@@ -40,8 +38,8 @@ def sampleWav(filename):
 
     with open("%s.txt" % filename) as f:
         for line in f:
-            (i1, i2, i3) = line.split()
-            num_samples += abs(int(float(i3)*Sr/512) - int(float(i2)*Sr/512))
+            (i1, i2, i3, i4, i5) = line.split()
+            num_samples += abs(int(float(i5)*Sr/512) - int(float(i4)*Sr/512))
 
     samples = np.zeros((num_samples, 88))
     pV = np.zeros((num_samples, 88))
@@ -49,10 +47,10 @@ def sampleWav(filename):
 
     with open("%s.txt" % filename) as f:
         for line in f:
-            (i1, i2, i3) = line.split()
-            (a, b, c) = (float(i1), float(i2), float(i3))
+            (i1, i2, i3, i4, i5) = line.split()
+            (a, b, c, d, e) = (midinote2Index(int(i1)), midinote2Index(int(i2)), midinote2Index(int(i3)), float(i4), float(i5))
             
-            y = np.array(Spec[int(b*Sr/512):int(c*Sr/512), :])
+            y = np.array(Spec[int(d*Sr/512):int(e*Sr/512), :])
             length = len(y)
             """ymin = y.min(axis=1)
             ymax = y.max(axis=1) - ymin
@@ -60,7 +58,7 @@ def sampleWav(filename):
                 y[m] = (2*(y[m]-ymin[m]) / (ymax[m] + 1e-6)) - 1 # Normalize spectrogram rows
             """
             samples[sample:sample+length] = y
-            pV[sample:sample+length] = np.tile(probVector(a), (length, 1))
+            pV[sample:sample+length] = np.tile(oneHotVector([a,b,c]), (length, 1))
             sample += length
 
     if random.random() < 0.8: # Training set or validation set?
@@ -89,28 +87,25 @@ def freq2Index(freq): # Convert frequency to its frequency bin index
 
 def midinote2Index(mid): # Convert piano midi note to cqt frequency bin index
 # MIDI interval 21-108 corresponds to: CQT indexes 0-87
-    if mid < 22:
-        return 0
+    if mid < 21:
+        return -1
     elif mid > 107:
         return 87
     else:
         return mid - 21
 
 def index2Midinote(i):
-    return i+21
+    return i + 21
     
-def index2Freq(index): # Converting the vector index into cents
-    return fbins[index]
-
-#def getSpecFrame(frame, sr): # Getting spectrum frame index, given the time-domain frame index
-#    return 
-    
-def oneHotVector(freq): # One-hot probability vector
+def oneHotVector(indexes): # One-hot probability vector
     c = np.zeros(BINS)
-    c[freq2Index(freq)] = 1
+    for i in indexes:
+        if i > -1:
+            c[i] = 1
     return c
 
-def probVector(freq): # Gaussian probability vector
+def probVector(index): # Gaussian probability vector
+    freq = fbins[index]
     c = np.zeros(BINS)
 
     for i in range(BINS):
@@ -119,24 +114,17 @@ def probVector(freq): # Gaussian probability vector
     return c
 
 def initData(): # Initialize the training and validation data
-    os.chdir("../midi/piano_mono_midi")
+    os.chdir("../midi/piano_poly_midi")
 
     files = []
     for file in glob.glob("*.mid"):
         files.append(file.split('.mid')[0]) # Get the list of file names
     total = len(files)
-    n_train = round(total*0.8) # %80 / %20 train-validation split
-    rand = random.sample(range(total), total)
 
-    print("Preparing training set:")
-    for i in range(n_train):
-        print("[%d/%d] %s..." % (i+1, n_train, files[rand[i]]))
-        sampleWav(files[rand[i]], 0) # Add samples for the training set
-
-    print("Preparing validation set:")
-    for j in range(n_train, total):
-        print("[%d/%d] %s..." % (j-n_train+1, total-n_train, files[rand[j]]))
-        sampleWav(files[rand[j]], 1) # Add samples for the validation set
+    print("Preparing the training and validation sets:")
+    for i in range(total):
+        print("[%d/%d] %s..." % (i+1, total, files[i]))
+        sample(files[i]) # Add samples for both training & validation
 
     print("\nTraining samples: %d" % len(trainx))
     print("Validation samples: %d\n" % len(validx))
@@ -154,19 +142,19 @@ def initData(): # Initialize the training and validation data
 
 def saveData():
     print("Saving data...")
-    np.save("../data/trainx.npy", trainx)
-    np.save("../data/trainy.npy", trainy)
-    np.save("../data/validx.npy", validx)
-    np.save("../data/validy.npy", validy)
+    np.save("../data/polyTX.npy", trainx)
+    np.save("../data/polyTY.npy", trainy)
+    np.save("../data/polyVX.npy", validx)
+    np.save("../data/polyVY.npy", validy)
     print("Data saved...")
 
 def loadData():
     global trainx, trainy, validx, validy
     print("Loading data...")
-    trainx = np.load("../data/trainx.npy")
-    trainy = np.load("../data/trainy.npy")
-    validx = np.load("../data/validx.npy")
-    validy = np.load("../data/validy.npy")
+    trainx = np.load("../data/polyTX.npy")
+    trainy = np.load("../data/polyTY.npy")
+    validx = np.load("../data/polyVX.npy")
+    validy = np.load("../data/polyVY.npy")
     print("Data loaded...")
 
 def modelClear(): # Clear the network model
@@ -180,9 +168,9 @@ def modelInit(dropouts=[0.15, 0.15]): # Initialize the network model
         
         b = Dense(BINS*5, activation="relu", name="dense1")(a)
         b = Dropout(dropouts[0], name="dropout1")(b)
-        b = Dense(BINS*3-2, activation="sigmoid", name="dense2")(b)
+        b = Dense(BINS*3, activation="sigmoid", name="dense2")(b)
         b = Dropout(dropouts[1], name="dropout2")(b)
-        b = Dense(BINS, activation="softmax", name="classifier")(b)
+        b = Dense(BINS, activation="sigmoid", name="classifier")(b)
 
         model = Model(inputs=a, outputs=b)
         model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['accuracy'])
@@ -249,7 +237,7 @@ def testNoteAccuracy():
     for i, x in enumerate(pp):
         if validy[i].argmax() == x.argmax():
             count2 += 1
-    print("Validation set: %d / %d correct. (%%%f)" % (count2, b, 100.*count2/b))
+    print("Validation set: %d/%d correct. (%%%f)" % (count2, b, 100.*count2/b))
 
 def testFile(filename): # Test the given file
     data, sampleRate = librosa.load(filename)
@@ -327,22 +315,23 @@ def testFileQuick(filename): # Test the given file
     onsets = np.append(onsets, [p.shape[0]-1])
 
     plt.figure(figsize=(12, 10))
-    ax1 = plt.subplot(2, 2, 1)
+    ax1 = plt.subplot(1, 2, 1)
     librosa.display.specshow(Spec, y_axis='cqt_hz', x_axis='time', cmap='magma')
     plt.title("Power spectrogram of %s" % filename, fontweight='bold')
   
-    plt.subplot(2, 2, 3, sharex=ax1)
+    plt.subplot(1, 2, 2)
     plt.plot(times, oenv, label='Onset Strength')
     plt.vlines(times[onsets], 0, oenv.max(), color='r', alpha=0.9, linestyle='--', label='Onsets')
     plt.axis('tight')
     plt.legend(frameon=True, framealpha=0.75)
+    plt.show()
     
-    plt.subplot(2, 2, 2)
     librosa.display.specshow(p.T, y_axis='cqt_hz', x_axis='time')
     plt.colorbar()
     plt.title("Predictions", fontweight='bold')
+    plt.show()
 
-    notes, starts, ends = ([], [], [])
+    """notes, starts, ends = ([], [], [])
     pp = np.multiply(np.tile(np.sum(pp, axis=1), (BINS, 1)).T, p)
     tran = np.zeros(p.shape)
     for i in range(len(onsets)-1):
@@ -364,7 +353,7 @@ def testFileQuick(filename): # Test the given file
     plt.title("Transcription", fontweight='bold')
     plt.show()
 
-    createMidi(notes, starts, ends, filename)
+    createMidi(notes, starts, ends, filename)"""
 
 def createMidi(notes, onsets, offsets, filename):
     piano_midi = pretty_midi.PrettyMIDI()

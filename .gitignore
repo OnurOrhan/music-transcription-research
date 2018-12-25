@@ -17,4 +17,5 @@ src/midi/piano_chords
 neuralChords.py
 neuralViterbi.py
 test_output.txt
+test.txt
 test.py
