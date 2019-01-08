@@ -10,6 +10,7 @@ mono-*.mp3
 poly-*.mp3
 
 # Data files (training and validation vectors)
+src/data
 *.npy
 
 test_output.txt
