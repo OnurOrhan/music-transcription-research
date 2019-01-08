@@ -44,7 +44,7 @@ for j, midi in enumerate(out_midis):
     
     file = open("%s.txt" % out_names[j].split('.mid')[0], "w") # Text file with the note information
     for note in midi.instruments[0].notes: # Going through the notes
-        file.write("%s " % pretty_midi.note_number_to_hz(note.pitch)) # Note frequency
+        file.write("%s " % note.pitch) # Note frequency
         file.write("%s " % note.start) # Note onset
         file.write("%s\n" % note.end) # Note offset
     file.close()
